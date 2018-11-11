@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>拼接模拟</title>
+    <link rel="stylesheet" href="static/css/montage.css">
+</head>
+<body>
+<div id="select-max">
+    请选择最大块的长度(目前仅支持900和1200)：
+    <select name="max-block" id="sel-max-size">
+        <option value="0" selected="selected">选择最大块</option>
+        <option value="900">900</option>
+        <option value="1200">1200</option>
+    </select>
+</div>
+<div id="base-blocks" class="div-hide">
+</div>
+<div id="select-fix" class="div-hide">
+</div>
+<div id="main-borad">
+    <div id="borad-tip" class="div-hide">
+        请输入墙面宽度和高度： 宽：<input id="board-width" type="text"/>&nbsp;&nbsp; 高：<input id="board-height" type="text"/>
+        <input id="board-build-btn" type="button" value="构建墙壁"/>
+    </div>
+    <table class="board-table" border="0" cellspacing="0" cellpadding="0">
+    </table>
+    <div id="board-statics" class="div-hide">
+    </div>
+</div>
+<div style="width: 100%; height: 50px;"></div>
+<div id="windows-borad">
+    <div id="insert-window-btn" class="div-hide"><input type="button" value="添加窗户"></div>
+    <div id="window-num-input" class="div-hide">
+        请输入窗户个数：<input id="window-num" type="text"/>&nbsp;
+        <input id="window-num-btn" type="button" value="确认"/>
+    </div>
+    <div id="window-info-block" class="div-hide">
+    </div>
+    <table class="board-table-window" border="0" cellspacing="0" cellpadding="0">
+    </table>
+</div>
+<div id="board-result" class="div-hide">
+</div>
+</body>
+<script type="text/javascript" src="static/js/jquery-1.12.4.min.js"></script>
+<script type="text/javascript">
+
+    var windowNum = 0;
+    var minSize = 300;
+    var maxSize = 0;
+    var oddFirst = 0;
+    var evenFirst = 0;
+    var boradArray = new Array();
+
+    $('#sel-max-size').on('change', function () {
+        var selectVal = parseInt($(this).val());
+        if (selectVal === 0) {
+            return;
+        }
+        maxSize = selectVal;
+        $('#select-max').addClass('div-hide');
+        $('#base-blocks').removeClass('div-hide');
+
+        var baseBlockHtml = '';
+        for (var i = minSize; i <= maxSize; i += minSize) {
+            baseBlockHtml += '<div class="block-size-' + i + ' color-' + i + '">' + i + '</div>';
+        }
+        $('#base-blocks').append(baseBlockHtml);
+
+        var leftFix = '请选择左边第一个拐角：' +
+                      '<select name="left-fix" id="left-fix-block" onchange="selectLeftFix();">' +
+                      '<option value="0" selected="selected">请选择第一个拐角</option>';
+        for (var i = minSize; i < maxSize; i += minSize) {
+            // 拐角不可是最大长度的一半
+            if (maxSize / i === 2) {
+                continue;
+            }
+            leftFix += '<option value="' + i + '">' + i + '</option>';
+        }
+       leftFix += '</select>';
+       $('#select-fix').append(leftFix);
+       $('#select-fix').removeClass('div-hide');
+    });
+
+    function selectLeftFix() {
+        var leftFix = $('#left-fix-block').val();
+        if (leftFix === 0) {
+            return;
+        }
+        oddFirst = leftFix;
+        evenFirst = maxSize - oddFirst;
+        $('#select-fix').addClass('div-hide');
+        $('#borad-tip').removeClass('div-hide');
+    }
+
+    $('#board-build-btn').click(function () {
+
+        // 校验输入值
+        var boardWidth = $.trim($('#board-width').val());
+        var boardHeight = $.trim($('#board-height').val())
+        var regPos = /^[1-9]\d*$/;
+        var tipMsg = '您输入的墙面长度或宽度不符合要求';
+        if (!regPos.test(boardWidth) || !regPos.test(boardHeight)) {
+            alert(tipMsg + '，请输入数字！');
+            return;
+        }
+        if (boardWidth < maxSize || boardHeight < minSize) {
+            alert(tipMsg + '，请重新输入宽度大于' + maxSize + '，高度大于' + minSize + '的正整数！');
+            return;
+        }
+        if (parseInt(boardWidth) > 50000 || parseInt(boardHeight) > 5000) {
+            alert("长度或宽度长，请重新输入！");
+            return;
+        }
+
+        // 创建墙壁对象
+        var boardObj = new Object();
+        boardObj.boradWidth = boardWidth;
+        boardObj.boradHeight = boardHeight;
+        boardObj.oddRowCount = 0;
+        boardObj.evenRowCount = 0;
+        boardObj.oddArray = new Array();
+        boardObj.evenArray = new Array();
+        boardObj.blockNumDict = new Array();
+        boardObj.oddRowNumDic = new Array();
+        boardObj.evenRowNumDic = new Array();
+        boardObj.boardHtml = '';
+
+        // 初始化块个数字典
+        for (var i = minSize; i <= maxSize; i += minSize) {
+            boardObj.oddRowNumDic[i] = 0;
+            boardObj.evenRowNumDic[i] = 0;
+        }
+
+        buildItemArray(boardObj);
+
+        // 隐藏输入框
+        $('#borad-tip').addClass('div-hide');
+        // 构建初始墙壁
+        buildBorad(boardObj, 'board-table');
+
+        // 显示统计信息
+        $('#board-statics').removeClass('div-hide');
+        var staticsHtml = '墙面宽度:<span id="board-statics-width">' + boardObj.boradWidth + '</span>&nbsp;&nbsp;' +
+                          '墙面高度:<span id="board-statics-height">' + boardObj.boradHeight + '</span>&nbsp;&nbsp;';
+        for (var i = minSize; i <= maxSize; i += minSize) {
+            boardObj.blockNumDict[i] = boardObj.oddRowNumDic[i] * boardObj.oddRowCount + boardObj.evenRowNumDic[i] * boardObj.evenRowCount;
+            staticsHtml += i + '个数:<span id="board-statics-num-' + i + '">' + boardObj.blockNumDict[i] + '</span>&nbsp;&nbsp;';
+        }
+        staticsHtml += '大拐角:<span id="board-block-big">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;' +
+                       '小拐角:<span id="board-block-small">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;';
+        $('#board-statics').append(staticsHtml);
+        // 墙壁对象添加至墙壁对象列表
+        boradArray.push(boardObj);
+        // 显示添加窗户按钮
+        $('#insert-window-btn').removeClass('div-hide');
+    });
+
+    $('#insert-window-btn').click(function () {
+        $('#insert-window-btn').addClass('div-hide');
+        $('#window-num-input').removeClass('div-hide');
+    });
+
+    $('#window-num-btn').click(function () {
+        windowNum = $('#window-num').val();
+
+        if (parseInt(windowNum) > 3) {
+            alert('窗户个数太多，请重新输入！');
+            return;
+        }
+
+        $('#window-num-input').addClass('div-hide');
+        $('#window-info-block').removeClass('div-hide');
+        for (var i = 0; i < windowNum; i++) {
+            var windowInfoHtml = '<div id="window-info-' + i + '">' +
+                '请输入第' + (i + 1) + '个窗户信息：' +
+                '宽度：<input id="window-width" type="text" />&nbsp;&nbsp;' +
+                '高度：<input id="window-height" type="text" />&nbsp;&nbsp;' +
+                '上边距：<input id="window-topoffset" type="text" />&nbsp;&nbsp;' +
+                '左边距：<input id="window-leftoffset" type="text" />&nbsp;&nbsp;' +
+                '</div>';
+            $('#window-info-block').append(windowInfoHtml);
+        }
+        var windowInfoBtnHtml = '<input id="window-info-btn" type="button" onclick="addWindowInfo();" value="确认" />';
+        $('#window-info-block').append(windowInfoBtnHtml);
+    });
+
+    function addWindowInfo() {
+        // 没有构建墙壁给出提示
+        if (boradArray.length === 0) {
+            alert("没有构建墙壁！");
+            return;
+        }
+        // 每次取列表中最后一堵墙
+        var boardObj = boradArray[boradArray.length - 1];
+
+        // 窗户对象存放至列表
+        var windowArray = new Array();
+        for (var i = 0; i < windowNum; i++) {
+            var windowInfoId = '#window-info-' + i;
+
+            var windowWidth = $.trim($(windowInfoId + ' #window-width').val());
+            var windowHeight = $.trim($(windowInfoId + ' #window-height').val());
+            var windowTopOffset = $.trim($(windowInfoId + ' #window-topoffset').val());
+            var windowLeftOffset = $.trim($(windowInfoId + ' #window-leftoffset').val());
+
+            var regPos = /^[1-9]\d*$/;
+            var tipMsg = '您输入的窗户信息不符合要求';
+            if (!regPos.test(windowWidth) || !regPos.test(windowHeight) || !regPos.test(windowTopOffset) || !regPos.test(windowLeftOffset)) {
+                alert(tipMsg + '，请输入正整数！');
+                return;
+            }
+            if (parseInt(windowWidth) > boardObj.boradWidth || parseInt(windowHeight) > boardObj.boradHeight) {
+                alert(tipMsg + '，窗户长宽不能超过墙面！');
+                return;
+            }
+            if (parseInt(windowLeftOffset) <= 0 || parseInt(windowTopOffset) <= 0) {
+                alert(tipMsg + '，窗户需要离墙边缘一定距离！');
+                return;
+            }
+            if (parseInt(windowLeftOffset) + parseInt(windowWidth) >= boardObj.boradWidth ||
+                parseInt(windowTopOffset) + parseInt(windowHeight) > boardObj.boradHeight) {
+                alert(tipMsg + '，窗户不能超过墙壁范围！');
+                return;
+            }
+
+            var windowInfo = new Object();
+            windowInfo.width = $(windowInfoId + ' #window-width').val();
+            windowInfo.height = $(windowInfoId + ' #window-height').val();
+            windowInfo.topOffset = $(windowInfoId + ' #window-topoffset').val();
+            windowInfo.leftOffset = $(windowInfoId + ' #window-leftoffset').val();
+            windowArray.push(windowInfo);
+        }
+        $('#window-info-block').addClass('div-hide');
+        // 插入窗户
+        $(".board-table-window").append(boardObj.boardHtml);
+        for (var i = 0; i < windowNum; i++) {
+            buildWindow(windowArray[i], boardObj);
+        }
+        var resultHtml = '最终结果：&nbsp;&nbsp;';
+        for (var i = minSize; i <= maxSize; i += minSize) {
+            resultHtml += i + '个数:<span id="board-result-num-' + i +'">' + boardObj.blockNumDict[i] + '</span>&nbsp;&nbsp;';
+        }
+        resultHtml += '大拐角:<span id="result-block-big">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;' +
+                       '小拐角:<span id="result-block-small">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;';
+        $('#board-result').append(resultHtml);
+        $('#board-result').removeClass('div-hide');
+    }
+
+    function buildItemArray(boardObj) {
+        // 计算奇偶行各模块数(每一行首尾大小角柱，奇数行偶数行相反)
+        // 添加奇数行砖块
+        pushItemArray(boardObj, boardObj.oddArray, boardObj.oddRowNumDic, oddFirst, evenFirst);
+        // 添加偶数行砖块
+        pushItemArray(boardObj, boardObj.evenArray, boardObj.evenRowNumDic, evenFirst, oddFirst);
+    }
+
+    function pushItemArray(boardObj, itemArray, rowNumDic, firstBlock, lastBlock) {
+        // 转化为整数
+        firstBlock = parseInt(firstBlock);
+        lastBlock = parseInt(lastBlock);
+        var maxSizeNum = parseInt((boardObj.boradWidth - firstBlock - lastBlock) / maxSize);
+        // 剩余大小块
+        var leaveBlock = boardObj.boradWidth - lastBlock - firstBlock - maxSizeNum * maxSize;
+
+        itemArray.push(firstBlock);
+        rowNumDic[maxSize] += maxSizeNum;
+        for (var i = 0; i < maxSizeNum; i++) {
+            itemArray.push(maxSize);
+        }
+        if (leaveBlock > 0) {
+            // 解决最后两块变齐的问题
+            if (leaveBlock + lastBlock === firstBlock || leaveBlock + firstBlock === lastBlock) {
+                itemArray[itemArray.length - 1] -= minSize;
+                leaveBlock += minSize;
+                rowNumDic[maxSize] -= 1;
+                rowNumDic[itemArray[itemArray.length - 1]] += 1;
+            }
+            itemArray.push(leaveBlock);
+            rowNumDic[colorNumTransform(leaveBlock)] += 1;
+        }
+        itemArray.push(lastBlock);
+    }
+
+    function buildBorad(boardObj, tableName) {
+        var rows = boardObj.boradHeight % minSize === 0 ? parseInt(boardObj.boradHeight / minSize) :
+                                                          (parseInt(boardObj.boradHeight / minSize) + 1);
+        var oddHtml = buildBlockHtml(boardObj.oddArray);
+        var evenHtml = buildBlockHtml(boardObj.evenArray);
+        var boardHtml = '';
+        for (var i = 0; i < rows; i++) {
+            var baseHtml = '<tr class="block-row" id="table-row-' + i + '"><td>';
+            if (i % 2 === 0) {
+                baseHtml += oddHtml;
+                boardObj.oddRowCount++;
+            } else {
+                baseHtml += evenHtml;
+                boardObj.evenRowCount++;
+            }
+            baseHtml += '</td></tr>';
+            boardHtml += baseHtml;
+        }
+        boardObj.boardHtml = boardHtml;
+        $("." + tableName).append(boardHtml);
+    }
+
+    function buildBlockHtml(itemArray) {
+        var blockHtml = '';
+        for (var j = 0; j < itemArray.length; j++) {
+            var item = itemArray[j];
+            var itemHtml = '';
+            if (item % minSize === 0) {
+                itemHtml = '<div class="block-size-' + item + ' color-' + item + ' item-' + j + '"></div>';
+            } else {
+                itemHtml = '<div class="color-' + colorNumTransform(item) + ' item-' + j + '" ' +
+                    'style="width: ' + parseInt(item / 10 - 1) + 'px; height: 29px; ' +
+                    'float: left; border: 1px solid #000000;"></div>';
+            }
+            blockHtml += itemHtml;
+        }
+        return blockHtml;
+    }
+
+    function resetPartCorlor(boardObj, row, windowObj) {
+
+        var itemArray = boardObj.oddArray;
+        var firstItem = parseInt(oddFirst);
+        // 判断奇偶行
+        if (row % 2 !== 0) {
+            itemArray = boardObj.evenArray;
+            firstItem = parseInt(evenFirst);
+        }
+        // 计算当前行占据块数
+        var notCoverLeft = windowObj.leftOffset >= firstItem;  // 是否有覆盖左边拐角
+        var left = notCoverLeft ? windowObj.leftOffset - firstItem : windowObj.leftOffset; // 除拐角外左边距离
+        var leftMaxCount = 0; // 窗户左边的完整砖块数（除拐角）
+        var itemIdx = notCoverLeft ? 1 : 0; // 当前行砖块位置索引
+
+        // 找到左边第一个被窗户覆盖的砖块
+        while (notCoverLeft && itemArray[itemIdx] <= left) {
+            left -= itemArray[itemIdx];
+            ++leftMaxCount;
+            ++itemIdx;
+        }
+        var leftCoverPart = 0; // 左边被部分覆盖的大小
+        // left等于0则表示窗户左边框刚好达到itemIdx位置砖块的左边框
+        if (left > 0) {
+            leftCoverPart = itemArray[itemIdx] - left;
+        }
+        // 替换第一个被部分覆盖的砖块颜色
+        if (notCoverLeft && left > 0 && itemIdx > 0) {
+            var blockLeftItem = '.board-table-window #table-row-' + row + ' td .item-' + itemIdx;
+            $(blockLeftItem).removeClass('color-' + colorNumTransform(itemArray[itemIdx]));
+            $(blockLeftItem).addClass('color-' + colorNumTransform(left));
+            boardObj.blockNumDict[itemArray[itemIdx]] -= 1;
+            boardObj.blockNumDict[colorNumTransform(left)] += 1;
+            ++itemIdx;
+        }
+
+        // 被完全覆盖砖块统计数量减少(注意有可能覆盖到了右边拐角)
+        var midMaxCount = 0; // 被完全覆盖的完整砖块数
+        var remainWindow = windowObj.width - leftCoverPart;  // 窗户覆盖剩余大小
+        // 覆盖了左边拐角，拐角后面一个开始
+        if (itemIdx === 0) {
+            ++itemIdx;
+        }
+        while (itemIdx < itemArray.length - 1 && itemArray[itemIdx] <= remainWindow) {
+            remainWindow -= itemArray[itemIdx];
+            boardObj.blockNumDict[itemArray[itemIdx]] -= 1;
+            ++midMaxCount;
+            ++itemIdx;
+        }
+
+        // 右边被部分覆盖砖块处理(注意有可能覆盖到了右边拐角)
+        if (itemIdx < itemArray.length - 1 && remainWindow > 0) {
+            var blockRightItem = '.board-table-window #table-row-' + row + ' td .item-' + itemIdx;
+            $(blockRightItem).removeClass('color-' + colorNumTransform(itemArray[itemIdx]));
+            $(blockRightItem).addClass('color-' + colorNumTransform(itemArray[itemIdx] - remainWindow));
+            boardObj.blockNumDict[itemArray[itemIdx]] -= 1;
+            boardObj.blockNumDict[colorNumTransform(itemArray[itemIdx] - remainWindow)] += 1;
+        }
+    }
+
+    // 将不是300整数倍的数转为300整数
+    function colorNumTransform(origNum) {
+        if (origNum % minSize === 0) {
+            return origNum;
+        }
+        var baseNum = minSize;
+        while (origNum > baseNum) {
+            baseNum += minSize;
+        }
+        return baseNum;
+    }
+
+    $(function () {
+
+    });
+
+    function buildWindow(windowObj, boardObj) {
+        var windowHtml = '<div class="window" ' +
+            'style="width: ' + parseInt(windowObj.width / 10 - 2) + 'px; ' +
+            'height: ' + parseInt(windowObj.height / 10 - 1) + 'px; ' +
+            'line-height: ' + parseInt(windowObj.height / 10 - 1) + 'px; ' +
+            'margin-left: ' + parseInt(windowObj.leftOffset / 10) + 'px; ' +
+            'margin-top: ' + parseInt((windowObj.topOffset - colorNumTransform(boardObj.boradHeight)) / 10 + 1) + 'px;">' +
+            '窗户</div>';
+        $('#windows-borad').append(windowHtml);
+        var fromRow = windowObj.topOffset % minSize === 0 ? parseInt(windowObj.topOffset / minSize) : parseInt(windowObj.topOffset / minSize) + 1;
+        var coverRows = parseInt(windowObj.height / minSize);
+        // 处理每一行 替换窗户附近砖块
+        for (var i = fromRow; i < fromRow + coverRows; i++) {
+            resetPartCorlor(boardObj, i, windowObj);
+        }
+    }
+
+</script>
+</html>
