@@ -69,8 +69,8 @@
         $('#base-blocks').append(baseBlockHtml);
 
         var leftFix = '请选择左边第一个拐角：' +
-                      '<select name="left-fix" id="left-fix-block" onchange="selectLeftFix();">' +
-                      '<option value="0" selected="selected">请选择第一个拐角</option>';
+            '<select name="left-fix" id="left-fix-block" onchange="selectLeftFix();">' +
+            '<option value="0" selected="selected">请选择第一个拐角</option>';
         for (var i = minSize; i < maxSize; i += minSize) {
             // 拐角不可是最大长度的一半
             if (maxSize / i === 2) {
@@ -78,9 +78,9 @@
             }
             leftFix += '<option value="' + i + '">' + i + '</option>';
         }
-       leftFix += '</select>';
-       $('#select-fix').append(leftFix);
-       $('#select-fix').removeClass('div-hide');
+        leftFix += '</select>';
+        $('#select-fix').append(leftFix);
+        $('#select-fix').removeClass('div-hide');
     });
 
     function selectLeftFix() {
@@ -133,8 +133,6 @@
             boardObj.evenRowNumDic[i] = 0;
         }
 
-        buildItemArray(boardObj);
-
         // 隐藏输入框
         $('#borad-tip').addClass('div-hide');
         // 构建初始墙壁
@@ -143,13 +141,13 @@
         // 显示统计信息
         $('#board-statics').removeClass('div-hide');
         var staticsHtml = '墙面宽度:<span id="board-statics-width">' + boardObj.boradWidth + '</span>&nbsp;&nbsp;' +
-                          '墙面高度:<span id="board-statics-height">' + boardObj.boradHeight + '</span>&nbsp;&nbsp;';
+            '墙面高度:<span id="board-statics-height">' + boardObj.boradHeight + '</span>&nbsp;&nbsp;';
         for (var i = minSize; i <= maxSize; i += minSize) {
             boardObj.blockNumDict[i] = boardObj.oddRowNumDic[i] * boardObj.oddRowCount + boardObj.evenRowNumDic[i] * boardObj.evenRowCount;
             staticsHtml += i + '个数:<span id="board-statics-num-' + i + '">' + boardObj.blockNumDict[i] + '</span>&nbsp;&nbsp;';
         }
         staticsHtml += '大拐角:<span id="board-block-big">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;' +
-                       '小拐角:<span id="board-block-small">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;';
+            '小拐角:<span id="board-block-small">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;';
         $('#board-statics').append(staticsHtml);
         // 墙壁对象添加至墙壁对象列表
         boradArray.push(boardObj);
@@ -240,10 +238,10 @@
         }
         var resultHtml = '最终结果：&nbsp;&nbsp;';
         for (var i = minSize; i <= maxSize; i += minSize) {
-            resultHtml += i + '个数:<span id="board-result-num-' + i +'">' + boardObj.blockNumDict[i] + '</span>&nbsp;&nbsp;';
+            resultHtml += i + '个数:<span id="board-result-num-' + i + '">' + boardObj.blockNumDict[i] + '</span>&nbsp;&nbsp;';
         }
         resultHtml += '大拐角:<span id="result-block-big">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;' +
-                       '小拐角:<span id="result-block-small">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;';
+            '小拐角:<span id="result-block-small">' + (boardObj.oddRowCount + boardObj.evenRowCount) + '</span>&nbsp;&nbsp;';
         $('#board-result').append(resultHtml);
         $('#board-result').removeClass('div-hide');
     }
@@ -251,27 +249,36 @@
     function buildItemArray(boardObj) {
         // 计算奇偶行各模块数(每一行首尾大小角柱，奇数行偶数行相反)
         // 添加奇数行砖块
-        pushItemArray(boardObj, boardObj.oddArray, boardObj.oddRowNumDic, oddFirst, evenFirst);
+        pushItemArray(boardObj, boardObj.oddArray, boardObj.oddRowNumDic, oddFirst);
         // 添加偶数行砖块
-        pushItemArray(boardObj, boardObj.evenArray, boardObj.evenRowNumDic, evenFirst, oddFirst);
+        pushItemArray(boardObj, boardObj.evenArray, boardObj.evenRowNumDic, evenFirst);
     }
 
-    function pushItemArray(boardObj, itemArray, rowNumDic, firstBlock, lastBlock) {
+    function pushItemArray(boardObj, itemArray, rowNumDic, firstBlock) {
         // 转化为整数
         firstBlock = parseInt(firstBlock);
-        lastBlock = parseInt(lastBlock);
-        var maxSizeNum = parseInt((boardObj.boradWidth - firstBlock - lastBlock) / maxSize);
+        var maxSizeNum = parseInt((boardObj.boradWidth - 2 * firstBlock) / maxSize);
         // 剩余大小块
-        var leaveBlock = boardObj.boradWidth - lastBlock - firstBlock - maxSizeNum * maxSize;
-
+        var leaveBlock = boardObj.boradWidth - 2 * firstBlock - maxSizeNum * maxSize;
         itemArray.push(firstBlock);
         rowNumDic[maxSize] += maxSizeNum;
-        for (var i = 0; i < maxSizeNum; i++) {
+        var midIndex = parseInt(maxSizeNum / 2);
+        // 中间的前半部分
+        for (var i = 0; i < midIndex; i++) {
             itemArray.push(maxSize);
         }
+
+        // 处理中间不足maxSize的部分
         if (leaveBlock > 0) {
-            // 解决最后两块变齐的问题
-            if (leaveBlock + lastBlock === firstBlock || leaveBlock + firstBlock === lastBlock) {
+            // 解决中间对其的问题
+            var midGap = leaveBlock + firstBlock - (maxSize - firstBlock);
+            // 需要特殊处理场景
+            if (Math.abs(midGap) < 300 && leaveBlock >= 150) {
+                // 当前行maxSize不是2的倍数，中间特殊部分往后挪
+                if (maxSizeNum % 2 !== 0) {
+                    itemArray.push(maxSize);
+                    midIndex++;
+                }
                 itemArray[itemArray.length - 1] -= minSize;
                 leaveBlock += minSize;
                 rowNumDic[maxSize] -= 1;
@@ -280,12 +287,25 @@
             itemArray.push(leaveBlock);
             rowNumDic[colorNumTransform(leaveBlock)] += 1;
         }
-        itemArray.push(lastBlock);
+
+        // 中间的后半部分
+        for (var i = midIndex; i < maxSizeNum; i++) {
+            itemArray.push(maxSize);
+        }
+
+        // 右边拐角
+        itemArray.push(firstBlock);
     }
 
     function buildBorad(boardObj, tableName) {
         var rows = boardObj.boradHeight % minSize === 0 ? parseInt(boardObj.boradHeight / minSize) :
-                                                          (parseInt(boardObj.boradHeight / minSize) + 1);
+            (parseInt(boardObj.boradHeight / minSize) + 1);
+        // 确定最底下那个拐角大小
+        if (rows % 2 === 0) {
+            oddFirst = evenFirst;
+            evenFirst = maxSize - oddFirst;
+        }
+        buildItemArray(boardObj);
         var oddHtml = buildBlockHtml(boardObj.oddArray);
         var evenHtml = buildBlockHtml(boardObj.evenArray);
         var boardHtml = '';
@@ -313,7 +333,7 @@
             if (item % minSize === 0) {
                 itemHtml = '<div class="block-size-' + item + ' color-' + item + ' item-' + j + '"></div>';
             } else {
-                itemHtml = '<div class="color-' + colorNumTransform(item) + ' item-' + j + '" ' +
+                itemHtml = '<div class="color-red item-' + j + '" ' +
                     'style="width: ' + parseInt(item / 10 - 1) + 'px; height: 29px; ' +
                     'float: left; border: 1px solid #000000;"></div>';
             }
@@ -351,9 +371,18 @@
         // 替换第一个被部分覆盖的砖块颜色
         if (notCoverLeft && left > 0 && itemIdx > 0) {
             var blockLeftItem = '.board-table-window #table-row-' + row + ' td .item-' + itemIdx;
-            $(blockLeftItem).removeClass('color-' + colorNumTransform(itemArray[itemIdx]));
-            $(blockLeftItem).addClass('color-' + colorNumTransform(left));
-            boardObj.blockNumDict[itemArray[itemIdx]] -= 1;
+            if (itemArray[itemIdx] % minSize === 0) {
+                $(blockLeftItem).removeClass('color-' + itemArray[itemIdx]);
+            } else {
+                $(blockLeftItem).removeClass('color-red');
+            }
+
+            if (left % minSize === 0) {
+                $(blockLeftItem).addClass('color-' + left);
+            } else {
+                $(blockLeftItem).addClass('color-red');
+            }
+            boardObj.blockNumDict[colorNumTransform(itemArray[itemIdx])] -= 1;
             boardObj.blockNumDict[colorNumTransform(left)] += 1;
             ++itemIdx;
         }
@@ -367,7 +396,7 @@
         }
         while (itemIdx < itemArray.length - 1 && itemArray[itemIdx] <= remainWindow) {
             remainWindow -= itemArray[itemIdx];
-            boardObj.blockNumDict[itemArray[itemIdx]] -= 1;
+            boardObj.blockNumDict[colorNumTransform(itemArray[itemIdx])] -= 1;
             ++midMaxCount;
             ++itemIdx;
         }
@@ -375,9 +404,19 @@
         // 右边被部分覆盖砖块处理(注意有可能覆盖到了右边拐角)
         if (itemIdx < itemArray.length - 1 && remainWindow > 0) {
             var blockRightItem = '.board-table-window #table-row-' + row + ' td .item-' + itemIdx;
-            $(blockRightItem).removeClass('color-' + colorNumTransform(itemArray[itemIdx]));
-            $(blockRightItem).addClass('color-' + colorNumTransform(itemArray[itemIdx] - remainWindow));
-            boardObj.blockNumDict[itemArray[itemIdx]] -= 1;
+            if (itemArray[itemIdx] % minSize === 0) {
+                $(blockRightItem).removeClass('color-' + itemArray[itemIdx]);
+            } else {
+                $(blockRightItem).removeClass('color-red');
+            }
+
+            if ((itemArray[itemIdx] - remainWindow) % minSize === 0) {
+                $(blockRightItem).addClass('color-' + (itemArray[itemIdx] - remainWindow));
+            } else {
+                $(blockRightItem).addClass('color-red');
+            }
+
+            boardObj.blockNumDict[colorNumTransform(itemArray[itemIdx])] -= 1;
             boardObj.blockNumDict[colorNumTransform(itemArray[itemIdx] - remainWindow)] += 1;
         }
     }

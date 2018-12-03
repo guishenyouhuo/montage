@@ -48,6 +48,10 @@ body {
     background-color: #ee5782;
 }
 
+.color-red{
+    background-color: #ee171a;
+}
+
 #base-blocks {
     height: 50px;
     display: block;
